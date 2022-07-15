@@ -32,16 +32,15 @@
 static uint16_t MODBUS_CRC16_v1( const unsigned char *buf, unsigned int len )
 {
 	uint16_t crc = 0xFFFF;
-	unsigned int i = 0;
-	char bit = 0;
+	char i = 0;
 
-	for( i = 0; i < len; i++ )
+	while(len--)
 	{
-		crc ^= buf[i];
+		crc ^= (*buf++);
 
-		for( bit = 0; bit < 8; bit++ )
+		for(i = 0; i < 8; i++)
 		{
-			if( crc & 0x0001 )
+			if( crc & 1 )
 			{
 				crc >>= 1;
 				crc ^= 0xA001;
@@ -59,19 +58,18 @@ static uint16_t MODBUS_CRC16_v1( const unsigned char *buf, unsigned int len )
 
 static uint16_t MODBUS_CRC16_v2( const unsigned char *buf, unsigned int len )
 {
-	static const uint16_t table[2] = { 0x0000, 0xA001 };
+	static const uint16_t table[2] = {0x0000, 0xA001};
 	uint16_t crc = 0xFFFF;
-	unsigned int i = 0;
 	char bit = 0;
 	unsigned int xor = 0;
 
-	for( i = 0; i < len; i++ )
+	while(len--)
 	{
-		crc ^= buf[i];
+		crc ^= (*buf++);
 
 		for( bit = 0; bit < 8; bit++ )
 		{
-			xor = crc & 0x01;
+			xor = crc & 1;
 			crc >>= 1;
 			crc ^= table[xor];
 		}
@@ -120,7 +118,7 @@ static uint16_t MODBUS_CRC16_v3( const unsigned char *buf, unsigned int len )
 	uint8_t xor = 0;
 	uint16_t crc = 0xFFFF;
 
-	while( len-- )
+	while(len--)
 	{
 		xor = (*buf++) ^ crc;
 		crc >>= 8;
@@ -130,8 +128,27 @@ static uint16_t MODBUS_CRC16_v3( const unsigned char *buf, unsigned int len )
 	return crc;
 }
 
+static uint16_t MODBUS_CRC16_v4( const unsigned char *buf, unsigned int len )
+{
+	static const uint16_t table[16] = {
+	0x0000, 0xcc01, 0xd801, 0x1400, 0xf001, 0x3c00, 0x2800, 0xe401,
+	0xa001, 0x6c00, 0x7800, 0xb401, 0x5000, 0x9c01, 0x8801, 0x4400 };
 
-void get_random_buffer( unsigned char *buf, unsigned int len )
+	uint16_t crc = 0xFFFF;
+
+	while(len--)
+	{
+		crc	= table[((*buf) ^ crc) & 0xF];
+		crc ^= (crc >> 4);
+
+		crc	= table[(((*buf++) >> 4) ^ crc) & 0xF];
+		crc ^= (crc >> 4);
+	}
+
+	return crc;
+}
+
+static void get_random_buffer( unsigned char *buf, unsigned int len )
 {
 	unsigned int i = 0;
 	srand(time(NULL));
@@ -158,9 +175,10 @@ int main( int argc, char * argv[] )
 		case 1: fncrc = MODBUS_CRC16_v1; break;
 		case 2: fncrc = MODBUS_CRC16_v2; break;
 		case 3: fncrc = MODBUS_CRC16_v3; break;
+		case 4: fncrc = MODBUS_CRC16_v4; break;
 
 		default:
-			fprintf(stderr,"Invalid Algorithm, (expected: 1, 2 or 3)\n");
+			fprintf(stderr,"Invalid Algorithm, (expected: 1, 2, 3 or 4)\n");
 			return EXIT_FAILURE;
 	}
 
